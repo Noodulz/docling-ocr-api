@@ -1,20 +1,40 @@
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages in a virtual environment
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Final stage
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install Tesseract (best quality OCR for Linux)
-RUN apt-get update && apt-get install -y \
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
     libglib2.0-0 \
     libgl1 \
     poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy installed packages from builder
+COPY --from=builder /root/.local /root/.local
 
+# Copy application
 COPY app.py .
+
+# Update PATH
+ENV PATH=/root/.local/bin:$PATH
 
 EXPOSE 8080
 
